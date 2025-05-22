@@ -15,7 +15,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.example.cmpcourse.repository.AppRepository
 import org.example.cmpcourse.settings.AppSettings
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.get
 
 class MultiNavigationRootComponent(context: ComponentContext) : ComponentContext by context {
 
@@ -300,7 +303,7 @@ class MainTabsComponent(
     private fun createMainTabsChild(tab: Tab, context: ComponentContext): MainTabsChild {
         return when (tab) {
             Tab.HOME -> {
-                val component = HomeComponent(
+                val component = HomeComponent.factory(
                     context = context,
                     navigateToDetail = {
                         navigateToDetail()
@@ -331,14 +334,28 @@ class MainTabsComponent(
 
 class HomeComponent(
     context: ComponentContext,
+    private val appRepository: AppRepository,
     private val navigateToDetail: () -> Unit,
 ) : ComponentContext by context {
 
     private val _email: MutableStateFlow<String> = MutableStateFlow("")
     val email: StateFlow<String> = _email
 
+    companion object : KoinComponent {
+        fun factory(
+            context: ComponentContext,
+            navigateToDetail: () -> Unit,
+        ) : HomeComponent {
+            return HomeComponent(
+                context = context,
+                navigateToDetail = navigateToDetail,
+                appRepository = get()
+            )
+        }
+    }
+
     init {
-        val currentEmail = AppSettings.getString(AppSettings.EMAIL, "")
+        val currentEmail = appRepository.getLoggedInEmail()
         _email.update { currentEmail }
     }
 
