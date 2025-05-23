@@ -13,12 +13,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import org.example.cmpcourse.common.componentScope
+import org.example.cmpcourse.model.Todo
 import org.example.cmpcourse.repository.AppRepository
+import org.example.cmpcourse.repository.TodoRepository
 import org.example.cmpcourse.settings.AppSettings
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
+import kotlin.random.Random
 
 class MultiNavigationRootComponent(context: ComponentContext) : ComponentContext by context {
 
@@ -222,7 +226,8 @@ class LoginComponent(
     }
 }
 
-class MainComponent(context: ComponentContext, private val logout: () -> Unit) : ComponentContext by context {
+class MainComponent(context: ComponentContext, private val logout: () -> Unit) :
+    ComponentContext by context {
     val navigation = StackNavigation<MainConfiguration>()
 
     val childStack = childStack(
@@ -335,36 +340,63 @@ class MainTabsComponent(
 class HomeComponent(
     context: ComponentContext,
     private val appRepository: AppRepository,
+    private val todoRepository: TodoRepository,
     private val navigateToDetail: () -> Unit,
 ) : ComponentContext by context {
 
     private val _email: MutableStateFlow<String> = MutableStateFlow("")
     val email: StateFlow<String> = _email
 
+    private val _todos: MutableStateFlow<List<Todo>> = MutableStateFlow(emptyList())
+    val todo: StateFlow<List<Todo>> = _todos
+
+    private val scope = componentScope()
+
     companion object : KoinComponent {
         fun factory(
             context: ComponentContext,
             navigateToDetail: () -> Unit,
-        ) : HomeComponent {
+        ): HomeComponent {
             return HomeComponent(
                 context = context,
                 navigateToDetail = navigateToDetail,
-                appRepository = get()
+                appRepository = get(),
+                todoRepository = get()
             )
         }
     }
 
     init {
         val currentEmail = appRepository.getLoggedInEmail()
+        fetchTodos()
         _email.update { currentEmail }
     }
 
     fun goToDetail() {
         navigateToDetail()
     }
+
+    private fun fetchTodos() {
+        scope.launch {
+            val newTodos = todoRepository.getAll()
+            _todos.update { newTodos }
+        }
+    }
+
+    fun addTodo() {
+        scope.launch {
+            val id = "" +
+                Random.nextInt(50) + Random.nextInt(50) + Random.nextInt(50) + Random.nextInt(50) + Random.nextInt(
+                    50
+                ) + Random.nextInt(50) + Random.nextInt(50)
+            todoRepository.add(Todo(id = id, title = "Todo sample", isDone = 0))
+            fetchTodos()
+        }
+    }
 }
 
-class ProfileComponent(context: ComponentContext, private val logout: () -> Unit) : ComponentContext by context {
+class ProfileComponent(context: ComponentContext, private val logout: () -> Unit) :
+    ComponentContext by context {
 
     fun doLogout() {
         AppSettings.logout()

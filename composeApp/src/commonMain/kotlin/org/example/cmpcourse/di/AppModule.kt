@@ -1,6 +1,12 @@
 package org.example.cmpcourse.di
 
+import org.example.cmpcourse.TodoDatabase
+import org.example.cmpcourse.database.DriverFactory
 import org.example.cmpcourse.repository.AppRepository
+import org.example.cmpcourse.repository.TodoRepository
+import org.example.cmpcourse.repository.TodoRepositoryImpl
+import org.example.cmpcourse.repository.WebTodoRepositoryImpl
+import org.koin.dsl.bind
 import org.koin.dsl.module
 
 /*
@@ -24,4 +30,13 @@ val appModule = module {
     single<AppRepository> {
         AppRepository()
     }
+    single {
+        val sqlDriver = DriverFactory().createDriver()
+        if (sqlDriver == null) {
+            WebTodoRepositoryImpl()
+        } else {
+            val database = TodoDatabase.invoke(sqlDriver)
+            TodoRepositoryImpl(database)
+        }
+    }.bind<TodoRepository>()
 }
