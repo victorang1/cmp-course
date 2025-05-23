@@ -1,5 +1,6 @@
 package org.example.cmpcourse.di
 
+import com.russhwolf.settings.Settings
 import org.example.cmpcourse.TodoDatabase
 import org.example.cmpcourse.database.DriverFactory
 import org.example.cmpcourse.repository.AppRepository
@@ -33,7 +34,7 @@ val appModule = module {
     single {
         val sqlDriver = DriverFactory().createDriver()
         if (sqlDriver == null) {
-            WebTodoRepositoryImpl()
+            WebTodoRepositoryImpl(Settings())
         } else {
             val database = TodoDatabase.invoke(sqlDriver)
             TodoRepositoryImpl(database)

@@ -261,3 +261,12 @@ fun MultiNavigationDetailScreen(component: DetailComponent) {
         }
     }
 }
+
+@Composable
+fun MultiNavigationAddEditTodoScreen(component: AddEditTodoComponent) {
+    Column(
+        modifier = Modifier.fillMaxSize()
+    ) {
+
+    }
+}
