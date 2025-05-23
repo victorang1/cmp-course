@@ -9,6 +9,7 @@ import com.arkivanov.decompose.router.stack.childStack
 import com.arkivanov.decompose.router.stack.pop
 import com.arkivanov.decompose.router.stack.pushNew
 import com.arkivanov.decompose.router.stack.replaceAll
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -230,6 +231,14 @@ class MainComponent(context: ComponentContext, private val logout: () -> Unit) :
     ComponentContext by context {
     val navigation = StackNavigation<MainConfiguration>()
 
+    sealed interface MainComponentEffect {
+        data object AddEditTodoSuccess : MainComponentEffect
+    }
+
+    private val _uiEffect: MutableSharedFlow<MainComponentEffect> = MutableSharedFlow()
+
+    private val scope = componentScope()
+
     val childStack = childStack(
         source = navigation,
         initialConfiguration = MainConfiguration.MainTabs,
@@ -245,12 +254,15 @@ class MainComponent(context: ComponentContext, private val logout: () -> Unit) :
             is MainConfiguration.MainTabs -> {
                 val component = MainTabsComponent(
                     context = context,
+                    effect = _uiEffect,
                     navigateToDetail = {
                         navigation.pushNew(MainConfiguration.Detail)
                     },
                     logout = logout,
-                    navigateToAddEditTodo = {
-                        navigation.pushNew(MainConfiguration.AddEditTodo)
+                    navigateToAddEditTodo = { todo ->
+                        navigation.pushNew(
+                            MainConfiguration.AddEditTodo(todo)
+                        )
                     }
                 )
                 MainChild.MainTabs(component)
@@ -269,7 +281,13 @@ class MainComponent(context: ComponentContext, private val logout: () -> Unit) :
             is MainConfiguration.AddEditTodo -> {
                 val component = AddEditTodoComponent.factory(
                     context = context,
-                    todo = null
+                    todo = configuration.todo,
+                    onComplete = {
+                        navigation.pop()
+                        scope.launch {
+                            _uiEffect.emit(MainComponentEffect.AddEditTodoSuccess)
+                        }
+                    }
                 )
                 MainChild.AddEditTodo(component)
             }
@@ -285,7 +303,7 @@ class MainComponent(context: ComponentContext, private val logout: () -> Unit) :
         data object Detail : MainConfiguration()
 
         @Serializable
-        data object AddEditTodo : MainConfiguration()
+        data class AddEditTodo(val todo: Todo?) : MainConfiguration()
     }
 
     sealed class MainChild {
@@ -297,8 +315,9 @@ class MainComponent(context: ComponentContext, private val logout: () -> Unit) :
 
 class MainTabsComponent(
     context: ComponentContext,
+    private val effect: MutableSharedFlow<MainComponent.MainComponentEffect>,
     private val navigateToDetail: () -> Unit,
-    private val navigateToAddEditTodo: () -> Unit,
+    private val navigateToAddEditTodo: (todo: Todo?) -> Unit,
     private val logout: () -> Unit
 ) : ComponentContext by context {
     enum class Tab {
@@ -326,11 +345,12 @@ class MainTabsComponent(
             Tab.HOME -> {
                 val component = HomeComponent.factory(
                     context = context,
+                    effect = effect,
                     navigateToDetail = {
                         navigateToDetail()
                     },
-                    navigateToAddEditTodo = {
-                        navigateToAddEditTodo()
+                    navigateToAddEditTodo = { todo ->
+                        navigateToAddEditTodo(todo)
                     }
                 )
                 MainTabsChild.Home(
@@ -358,10 +378,11 @@ class MainTabsComponent(
 
 class HomeComponent(
     context: ComponentContext,
+    private val effect: MutableSharedFlow<MainComponent.MainComponentEffect>,
     private val appRepository: AppRepository,
     private val todoRepository: TodoRepository,
     private val navigateToDetail: () -> Unit,
-    private val navigateToAddEditTodo: () -> Unit
+    private val navigateToAddEditTodo: (todo: Todo?) -> Unit
 ) : ComponentContext by context {
 
     private val _email: MutableStateFlow<String> = MutableStateFlow("")
@@ -375,11 +396,13 @@ class HomeComponent(
     companion object : KoinComponent {
         fun factory(
             context: ComponentContext,
+            effect: MutableSharedFlow<MainComponent.MainComponentEffect>,
             navigateToDetail: () -> Unit,
-            navigateToAddEditTodo: () -> Unit
+            navigateToAddEditTodo: (todo: Todo?) -> Unit
         ): HomeComponent {
             return HomeComponent(
                 context = context,
+                effect = effect,
                 navigateToDetail = navigateToDetail,
                 appRepository = get(),
                 todoRepository = get(),
@@ -392,6 +415,15 @@ class HomeComponent(
         val currentEmail = appRepository.getLoggedInEmail()
         fetchTodos()
         _email.update { currentEmail }
+        scope.launch {
+            effect.collect { ef ->
+                when (ef) {
+                    is MainComponent.MainComponentEffect.AddEditTodoSuccess -> {
+                        fetchTodos()
+                    }
+                }
+            }
+        }
     }
 
     fun goToDetail() {
@@ -405,8 +437,30 @@ class HomeComponent(
         }
     }
 
+    fun goToAddEditTodo(todo: Todo) {
+        navigateToAddEditTodo(todo)
+    }
+
     fun addTodo() {
-        navigateToAddEditTodo()
+        navigateToAddEditTodo(null)
+    }
+
+    fun onCheckChange(todo: Todo, newChecked: Boolean) {
+        scope.launch {
+            todoRepository.update(
+                todo.copy(
+                    isDone = if (newChecked) 1 else 0
+                )
+            )
+            fetchTodos()
+        }
+    }
+
+    fun delete(todo: Todo) {
+        scope.launch {
+            todoRepository.delete(todo.id)
+            fetchTodos()
+        }
     }
 }
 
@@ -429,24 +483,41 @@ class DetailComponent(context: ComponentContext, private val onBack: () -> Unit)
 
 class AddEditTodoComponent(
     context: ComponentContext,
-    todo: Todo? = null,
+    private val todo: Todo? = null,
     private val todoRepository: TodoRepository,
+    private val onComplete: () -> Unit
 ) : ComponentContext by context {
 
     private val _uiState: MutableStateFlow<AddEditTodoUiState> = MutableStateFlow(AddEditTodoUiState())
+    val uiState: StateFlow<AddEditTodoUiState> = _uiState.asStateFlow()
 
     private val scope = componentScope()
 
     companion object : KoinComponent {
         fun factory(
             context: ComponentContext,
-            todo: Todo? = null
+            todo: Todo? = null,
+            onComplete: () -> Unit
         ): AddEditTodoComponent {
             return AddEditTodoComponent(
                 context = context,
                 todo = todo,
-                todoRepository = get()
+                todoRepository = get(),
+                onComplete = onComplete
             )
+        }
+    }
+
+    init {
+        if (todo != null) {
+            _uiState.update { uiState ->
+                uiState.copy(
+                    id = todo.id,
+                    title = todo.title,
+                    isDone = todo.isDone,
+                    idEnabled = false
+                )
+            }
         }
     }
 
@@ -484,7 +555,12 @@ class AddEditTodoComponent(
                         title = uiState.title,
                         isDone = uiState.isDone
                     )
-                    todoRepository.add(newTodo)
+                    if (todo != null) {
+                        todoRepository.update(newTodo)
+                    } else {
+                        todoRepository.add(newTodo)
+                    }
+                    onComplete()
                 }
             }
         }
@@ -500,7 +576,8 @@ class AddEditTodoComponent(
     data class AddEditTodoUiState(
         val id: String = "",
         val title: String = "",
-        val isDone: Long = 0
+        val isDone: Long = 0,
+        val idEnabled: Boolean = true
     )
 }
 

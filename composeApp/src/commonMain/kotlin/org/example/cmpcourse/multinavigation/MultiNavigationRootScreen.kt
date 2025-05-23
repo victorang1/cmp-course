@@ -1,5 +1,6 @@
 package org.example.cmpcourse.multinavigation
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -11,6 +12,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
@@ -123,6 +125,7 @@ fun MultiNavigationMainScreen(component: MainComponent) {
         when (val ch = child.instance) {
             is MainComponent.MainChild.MainTabs -> MultiNavigationMainTabsScreen(ch.component)
             is MainComponent.MainChild.Detail -> MultiNavigationDetailScreen(ch.component)
+            is MainComponent.MainChild.AddEditTodo -> MultiNavigationAddEditTodoScreen(ch.component)
         }
     }
 }
@@ -196,7 +199,9 @@ fun MultiNavigationHomeScreen(component: HomeComponent) {
     ) { innerPadding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             items(todos) { todo ->
-                Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                Card(modifier = Modifier.fillMaxWidth().padding(16.dp).clickable {
+                    component.goToAddEditTodo(todo)
+                }) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(text = todo.id)
                         Spacer(modifier = Modifier.height(4.dp))
@@ -204,8 +209,16 @@ fun MultiNavigationHomeScreen(component: HomeComponent) {
                         Spacer(modifier = Modifier.height(4.dp))
                         Checkbox(
                             checked = todo.isDone == 1L,
-                            onCheckedChange = {
-                                //
+                            onCheckedChange = { checked ->
+                                component.onCheckChange(todo, checked)
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            modifier = Modifier.clickable {
+                                component.delete(todo)
                             }
                         )
                     }
@@ -264,9 +277,60 @@ fun MultiNavigationDetailScreen(component: DetailComponent) {
 
 @Composable
 fun MultiNavigationAddEditTodoScreen(component: AddEditTodoComponent) {
-    Column(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    val uiState by component.uiState.collectAsStateWithLifecycle()
+    Scaffold { innerPadding ->
+        Column(
+            modifier = Modifier.fillMaxSize().padding(innerPadding)
+        ) {
+            TextField(
+                value = uiState.id,
+                onValueChange = { id ->
+                    component.onEvent(
+                        AddEditTodoComponent.AddEditTodoEvent.UpdateID(
+                            id
+                        )
+                    )
+                },
+                enabled = uiState.idEnabled
+            )
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            TextField(
+                value = uiState.title,
+                onValueChange = { title ->
+                    component.onEvent(
+                        AddEditTodoComponent.AddEditTodoEvent.UpdateTitle(
+                            title
+                        )
+                    )
+                }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Checkbox(
+                checked = uiState.isDone == 1L,
+                onCheckedChange = { newCheckedValue ->
+                    component.onEvent(
+                        AddEditTodoComponent.AddEditTodoEvent.OnIsDoneCheckedChange(
+                            newCheckedValue
+                        )
+                    )
+                }
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = {
+                    component.onEvent(
+                        AddEditTodoComponent.AddEditTodoEvent.Submit
+                    )
+                }
+            ) {
+                Text(text = "Submit")
+            }
+        }
     }
 }
