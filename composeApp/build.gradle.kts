@@ -11,6 +11,7 @@ plugins {
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
     kotlin("plugin.serialization") version "2.1.20"
+    id("app.cash.sqldelight") version "2.1.0"
 }
 
 kotlin {
@@ -60,6 +61,7 @@ kotlin {
         androidMain.dependencies {
             implementation(compose.preview)
             implementation(libs.androidx.activity.compose)
+            implementation("app.cash.sqldelight:android-driver:2.1.0")
         }
         val commonMain by getting {
             dependencies {
@@ -78,6 +80,8 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
                 implementation("com.russhwolf:multiplatform-settings:1.3.0")
                 implementation("com.russhwolf:multiplatform-settings-no-arg:1.3.0")
+                implementation("io.insert-koin:koin-core:4.0.3")
+                implementation("com.arkivanov.essenty:lifecycle-coroutines:2.5.0")
             }
         }
         commonTest.dependencies {
@@ -86,6 +90,7 @@ kotlin {
         desktopMain.dependencies {
             implementation(compose.desktop.currentOs)
             implementation(libs.kotlinx.coroutinesSwing)
+            implementation("app.cash.sqldelight:sqlite-driver:2.1.0")
         }
 
         val wasmJsMain by getting {
@@ -103,6 +108,10 @@ kotlin {
             iosX64Main.dependsOn(this)
             iosArm64Main.dependsOn(this)
             iosSimulatorArm64Main.dependsOn(this)
+
+            dependencies {
+                implementation("app.cash.sqldelight:native-driver:2.1.0")
+            }
         }
     }
 }
@@ -146,6 +155,14 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "org.example.cmpcourse"
             packageVersion = "1.0.0"
+        }
+    }
+}
+
+sqldelight {
+    databases {
+        create("TodoDatabase") {
+            packageName.set("org.example.cmpcourse")
         }
     }
 }

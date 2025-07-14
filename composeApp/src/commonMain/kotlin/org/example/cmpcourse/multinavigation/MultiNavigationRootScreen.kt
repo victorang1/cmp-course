@@ -4,12 +4,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -173,21 +180,55 @@ fun MultiNavigationMainTabsScreen(component: MainTabsComponent) {
 @Composable
 fun MultiNavigationHomeScreen(component: HomeComponent) {
     val email by component.email.collectAsStateWithLifecycle()
-    Column(
-        modifier = Modifier.fillMaxSize(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Text(
-            text = email
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-        Button(onClick = {
-            component.goToDetail()
-        }) {
-            Text(text = "Go To Detail")
+    val todos by component.todo.collectAsStateWithLifecycle()
+
+    Scaffold(
+        floatingActionButton = {
+            FloatingActionButton(onClick = {
+                component.addTodo()
+            }) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = null
+                )
+            }
+        }
+    ) { innerPadding ->
+        LazyColumn(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            items(todos) { todo ->
+                Card(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(text = todo.id)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(text = todo.title)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Checkbox(
+                            checked = todo.isDone == 1L,
+                            onCheckedChange = {
+                                //
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
+
+//    Column(
+//        modifier = Modifier.fillMaxSize(),
+//        horizontalAlignment = Alignment.CenterHorizontally,
+//        verticalArrangement = Arrangement.Center
+//    ) {
+//        Text(
+//            text = email
+//        )
+//        Spacer(modifier = Modifier.height(8.dp))
+//        Button(onClick = {
+//            component.goToDetail()
+//        }) {
+//            Text(text = "Go To Detail")
+//        }
+//    }
 }
 
 @Composable
